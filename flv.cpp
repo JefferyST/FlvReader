@@ -1,6 +1,6 @@
 #include "flv.h"
 
-// 网络字节到小端
+// Big endlian to little endlian
 template <class T>
 T ntole(T num)
 {
@@ -46,14 +46,12 @@ bool CFlvParser::OpenFlv(FILE *file)
 int CFlvParser::ParseFile()
 {
 	uint32_t curPos = 0;
-	//文件指针移到末尾
+
 	fseek(m_pFlvFile, 0, SEEK_END);
-	//得到当前文件指针位置
 	m_uiFileLen = ftell(m_pFlvFile);
-	//移到头部
 	fseek(m_pFlvFile, 0, SEEK_SET);
 
-	//读取头部9字节
+
 	fread(m_Headder.Signature, 1, 3, m_pFlvFile);
 	fread(&m_Headder.Version, 1, 1, m_pFlvFile);
 	fread(&m_Headder.Flags, 1, 1, m_pFlvFile);
@@ -62,8 +60,8 @@ int CFlvParser::ParseFile()
 	fseek(m_pFlvFile, 4, SEEK_CUR);
 	curPos = ParseMetaTag()+13;
 
-	//去掉最后四个结束标志字节：00 00 00 10
-	while (curPos<m_uiFileLen-4)
+	
+	while (curPos<m_uiFileLen-4)//Remove the last four ending flags：00 00 00 10
 	{
 		uint32_t uiPreTagSize = ReadFile32();
 		TagHeader tagHeader;
@@ -71,7 +69,7 @@ int CFlvParser::ParseFile()
 		
 		fread(&tagHeader, 1, TAG_HEAD_LEN, m_pFlvFile);
 
-		curPos += 15;//previous tag size 4 + tag head 11,移动到音频或者视频的数据部分
+		curPos += 15;//previous tag size 4 + tag head 11,skip to the data of audio or video
 
 		int tagheader_datasize = tagHeader.DataSize[0] * 65536 + tagHeader.DataSize[1] * 256 + tagHeader.DataSize[2];
 		int tagheader_timestamp = tagHeader.Timestamp[0] * 65536 + tagHeader.Timestamp[1] * 256 + tagHeader.Timestamp[2];
@@ -80,15 +78,15 @@ int CFlvParser::ParseFile()
 		switch (tagHeader.TagType) {
 		case TAG_TYPE_AUDIO:
 		{
-			ParseAudioTag();//一字节:0xaf
-			//得到adts头
+			ParseAudioTag();
+			//Adts header
 			if (!m_bIsAdtsHeadInit && A_CODEC_ID_AAC == m_mediaInfo.audio_codec_id)
 			{
 				uint8_t aacPacketType = 0;
 				fread(&aacPacketType, 1, 1, m_pFlvFile);
 				if (0x00 == aacPacketType)
 				{
-					//第一个auido tag数据包含AudioSpecificConfig，解析后用于生成adts头
+					//Audio Specific Config
 					fread(m_szAudioSpecificConfig, 1, tagheader_datasize - 2, m_pFlvFile);
 					uint8_t audio_object_type = 2;
 					uint8_t sampling_frequency_index = 7;
@@ -101,10 +99,10 @@ int CFlvParser::ParseFile()
 						audio_object_type >>= 3;
 
 						//sampling frequency index:4bit
-						//高3bits
+						//high3bits
 						sampling_frequency_index = m_szAudioSpecificConfig[0] & 0x07;
 						sampling_frequency_index <<= 1;
-						//低1bit
+						//low 1bit
 						uint8_t tmp = m_szAudioSpecificConfig[1] & 0x80;
 						tmp >>= 7;
 						sampling_frequency_index |= tmp;
@@ -114,9 +112,9 @@ int CFlvParser::ParseFile()
 						channel_config >>= 3;
 					}
 				
-					//构造adts头(先得到前几位)
-					m_mediaInfo.AacHeader[0] = 0xff;         //syncword:0xfff                          高8bits
-					m_mediaInfo.AacHeader[1] = 0xf0;         //syncword:0xfff                          低4bits
+					//construct adts header
+					m_mediaInfo.AacHeader[0] = 0xff;         //syncword:0xfff                          high 8bits
+					m_mediaInfo.AacHeader[1] = 0xf0;         //syncword:0xfff                          low 4bits
 					m_mediaInfo.AacHeader[1] |= (0 << 3);    //MPEG Version:0 for MPEG-4,1 for MPEG-2  1bit
 					m_mediaInfo.AacHeader[1] |= (0 << 1);    //Layer:0                                 2bits 
 					m_mediaInfo.AacHeader[1] |= 1;           //protection absent:1                     1bit
@@ -124,14 +122,14 @@ int CFlvParser::ParseFile()
 					m_mediaInfo.AacHeader[2] = (audio_object_type - 1)<<6;            //profile:audio_object_type - 1                      2bits
 					m_mediaInfo.AacHeader[2] |= (sampling_frequency_index & 0x0f)<<2; //sampling frequency index:sampling_frequency_index  4bits 
 					m_mediaInfo.AacHeader[2] |= (0 << 1);                             //private bit:0                                      1bit
-					m_mediaInfo.AacHeader[2] |= (channel_config & 0x04)>>2;           //channel configuration:channel_config               高1bit
+					m_mediaInfo.AacHeader[2] |= (channel_config & 0x04)>>2;           //channel configuration:channel_config               high 1bit
 
-					m_mediaInfo.AacHeader[3] = (channel_config & 0x03)<<6;     //channel configuration:channel_config      低2bits
+					m_mediaInfo.AacHeader[3] = (channel_config & 0x03)<<6;     //channel configuration:channel_config      low 2bits
 					m_mediaInfo.AacHeader[3] |= (0 << 5);                      //original：0                               1bit
 					m_mediaInfo.AacHeader[3] |= (0 << 4);                      //home：0                                   1bit
 					m_mediaInfo.AacHeader[3] |= (0 << 3);                      //copyright id bit：0                       1bit  
 					m_mediaInfo.AacHeader[3] |= (0 << 2);                      //copyright id start：0                     1bit
-					//m_mediaInfo.AacHeader[3] |= ((m_mediaInfo. & 0x1800) >> 11); //frame length：value,                  高2bits 
+					//m_mediaInfo.AacHeader[3] |= ((m_mediaInfo. & 0x1800) >> 11); //frame length：value,                  high 2bits 
 
 				
 					//m_mediaInfo.AacHeader[4] = (tmp >> 3) & 0xff;
@@ -146,8 +144,8 @@ int CFlvParser::ParseFile()
 
 			if (A_CODEC_ID_AAC == m_mediaInfo.audio_codec_id)
 			{
-				tmpPacket.size = tagheader_datasize - 1 - 1; //减去头部1字节：AACPacketType
-				//跳过前一个字节：AACPacketType 
+				tmpPacket.size = tagheader_datasize - 1 - 1; //minus 1 byte：AACPacketType
+				//skip 1 byte：AACPacketType 
 				tmpPacket.offset = ftell(m_pFlvFile) + 1;
 			}
 			else
@@ -160,7 +158,7 @@ int CFlvParser::ParseFile()
 			tmpPacket.pts = tmpPacket.dts;
 			tmpPacket.stream_type = TYPE_AUDIO;
 
-            //跳过data
+            //skip data
 			fseek(m_pFlvFile, tagheader_datasize - 1,SEEK_CUR);
 			if (tmpPacket.size > 0)
 			{
@@ -174,13 +172,13 @@ int CFlvParser::ParseFile()
 		{
 			int iRet = ParseVideoTag();
 
-			//第一个video tag 为sps与pps数据
+			//sps and pps
 			if (!m_bIsSPSPPSInit && V_CODEC_ID_H264 == m_mediaInfo.video_codec_id)
 			{
 				uint8_t spsCount = 0;
 				uint8_t ppsCount = 0;
 
-				//跳过AVCDecoderConfigurationRecord(见ISO_IEC_14496-15)结构前9个字节
+				//skip AVCDecoderConfigurationRecord(ISO_IEC_14496-15)
 				fseek(m_pFlvFile, 9, SEEK_CUR);
 
 				fread(&spsCount, 1, 1, m_pFlvFile);
@@ -220,7 +218,7 @@ int CFlvParser::ParseFile()
 			if (V_CODEC_ID_H264 == m_mediaInfo.video_codec_id)
 			{
 				tmpPacket.size = tagheader_datasize - 1 -4;
-				//前4个字节：AVCPacketType(1),composition time(3)
+				//AVCPacketType(1 byte),composition time(3 bytes)
 				uint8_t AVCPacketType = 0;
 				fread(&AVCPacketType, 1, 1, m_pFlvFile);
 				uint8_t CompositionTimeTmp[3] = { 0 };
@@ -242,7 +240,7 @@ int CFlvParser::ParseFile()
 			tmpPacket.key_frame = iRet;
 			tmpPacket.stream_type = TYPE_VIDEO;
 			
-			//跳过data
+			//skip data
 			fseek(m_pFlvFile, tagheader_datasize - 1, SEEK_CUR);
 			m_vcAVFrameIndex.push_back(tmpPacket);
 
@@ -253,7 +251,7 @@ int CFlvParser::ParseFile()
 		}
 
 	}
-	//获取关键帧索引
+	//get the index of keyframe
 	for (int i=0;i<m_vcAVFrameIndex.size();i++)
 	{
 		if (m_vcAVFrameIndex[i].key_frame == 1 && m_vcAVFrameIndex[i].stream_type == TYPE_VIDEO)
@@ -280,17 +278,16 @@ int CFlvParser::ParseMetaTag()
 	int amf1_strsize = 0, amf2_arraysize = 0;
 	char amf1_str[64] = { 0 };
 
-	//第一个AMF包
+	//The first AMF
 	fread(&amf1_type, 1, 1, m_pFlvFile);
 	amf1_strsize = ReadFile16();
 	fread(amf1_str, 1, amf1_strsize, m_pFlvFile);
 
-	//第二个AMF包
+	//The second AMF
 	fread(&metaname_length, 1, 1, m_pFlvFile);
 	amf2_arraysize = ReadFile32();
 
 	int metadata_size = tagheader_datasize - 18;
-	//解析具体数据
 	ParseMetaData(metadata_size);
 	
 	return tagheader_datasize+ TAG_HEAD_LEN;
@@ -308,7 +305,7 @@ int CFlvParser::ParseAudioTag()
 	audio_codec_id = szFirsrByte & 0xf0;
 	audio_codec_id >>= 4;
 
-	//前4 bits得到编码类型
+	//encoder(4 bits)
 	switch (audio_codec_id)
 	{
 	case FLV_A_CODECID_MP3:
@@ -322,7 +319,7 @@ int CFlvParser::ParseAudioTag()
 		break;
 	}
 
-	//解析2 bits 采样率
+	//sample rate(2 bits)
 	audio_sample_rate = szFirsrByte & 0x0c;
 	audio_sample_rate >>= 2;
 	switch (audio_sample_rate)
@@ -340,7 +337,7 @@ int CFlvParser::ParseAudioTag()
 		m_mediaInfo.audio_sample_rate = 44000;
 		break;
 	}
-    //解析1 bit 音频比特数
+    //sample bit(1 bit)
 	audio_sample_bit = szFirsrByte & 0x02;
 	audio_sample_bit >>= 1;
 	if (0 == audio_sample_bit)
@@ -351,7 +348,7 @@ int CFlvParser::ParseAudioTag()
 	{
 		m_mediaInfo.audio_sample_size = 16;
 	}
-   //解析1 bit 音频声道数
+   //channel(1 bit)
 	audio_channel = szFirsrByte & 0x01;
 	if (0 == audio_channel)
 	{
@@ -412,12 +409,10 @@ int CFlvParser::ParseMetaData(int size)
 	while (1)  
 	{
 		metaname_length = ReadFile16();
-		//当metanamer长度为0，表示所有metadata读取完毕
-		if (DATA_TYPE_NUMBER == metaname_length)
+		if (DATA_TYPE_NUMBER == metaname_length)//The end of metadata
 		{
 			offset += 2;
-			//跳过多余的填充数据
-			if (offset<size)
+			if (offset<size)//skip
 			{
 				fseek(m_pFlvFile, size - offset, SEEK_CUR);
 				break;
@@ -429,8 +424,8 @@ int CFlvParser::ParseMetaData(int size)
 		offset = offset + 2 + metaname_length + 1;
 
 		std::cout << std::string(metaname)<< std::endl;
-		//double类型
-		if (0 == amf_data_type)
+		
+		if (0 == amf_data_type)//double
 		{
 			if (std::string(metaname) == "duration"){
 				m_metaData.duration = ReadDouble();             
@@ -468,9 +463,9 @@ int CFlvParser::ParseMetaData(int size)
 				m_metaData.audiocodecid = ReadDouble();           //audiocodecid
 			}
 			else if (std::string(metaname) == "filesize"){
-				m_metaData.filesize = ReadDouble();                 //file size or encoder
+				m_metaData.filesize = ReadDouble();               //file size or encoder
 			}else {
-				fseek(m_pFlvFile, 8, SEEK_CUR);            //其他直接跳过
+				fseek(m_pFlvFile, 8, SEEK_CUR);            		  //skip
 			}
 
 			offset += 8;
@@ -490,7 +485,7 @@ int CFlvParser::ParseMetaData(int size)
 			offset += 1;
 			
 		}
-		else if (DATA_TYPE_STRING == amf_data_type)   //string类型
+		else if (DATA_TYPE_STRING == amf_data_type)   //string
 		{
 			if (std::string(metaname) == "encoder")
 			{
@@ -516,11 +511,7 @@ int CFlvParser::ParseMetaData(int size)
 	return 0;
 }
 
-/******************************************************
-* 功能：获取音视频帧
-* 输入：视频帧存储缓冲，帧索引（默认-1,表示从当前的索引继续往下读取）
-* 返回：视频帧大小
-/******************************************************/
+
 uint32_t CFlvParser::ReadAvFrame(DataPacket &packet, int64_t index)
 {
 	std::vector<FlvPacket>& vcTmpIndex = m_vcAVFrameIndex;
@@ -557,7 +548,7 @@ uint32_t CFlvParser::ReadAvFrame(DataPacket &packet, int64_t index)
 
 		if (V_CODEC_ID_H264 == m_mediaInfo.video_codec_id)
 		{
-			//h264编码视频数据头四个字节为该nalu长度，所以替换为标准分隔符
+			//replace with standard file header
 			szTmpBuf[0] = 0x00;
 			szTmpBuf[1] = 0x00;
 			szTmpBuf[2] = 0x00;
@@ -573,12 +564,12 @@ uint32_t CFlvParser::ReadAvFrame(DataPacket &packet, int64_t index)
 
 		if (A_CODEC_ID_AAC == m_mediaInfo.audio_codec_id)
 		{
-			//得到aac头部
+			//get aac header
 			int tmpLen = packet.data_size + 7;
-			m_mediaInfo.AacHeader[3] |= ((tmpLen & 0x1800) >> 11);           //frame length：tmpLen      高2bits
-			m_mediaInfo.AacHeader[4] = (uint8_t)((tmpLen & 0x7f8) >> 3);     //frame length：tmpLen      中间8bits 
-			m_mediaInfo.AacHeader[5] = (uint8_t)((tmpLen & 0x7) << 5);       //frame length：tmpLen      低3bits  
-			m_mediaInfo.AacHeader[5] |= 0x1f;                                //buffer fullness：0x7ff    高5bits
+			m_mediaInfo.AacHeader[3] |= ((tmpLen & 0x1800) >> 11);           //frame length：tmpLen      high 2bits
+			m_mediaInfo.AacHeader[4] = (uint8_t)((tmpLen & 0x7f8) >> 3);     //frame length：tmpLen      middle 8bits 
+			m_mediaInfo.AacHeader[5] = (uint8_t)((tmpLen & 0x7) << 5);       //frame length：tmpLen      low 3bits  
+			m_mediaInfo.AacHeader[5] |= 0x1f;                                //buffer fullness：0x7ff    high 5bits
 
 			for (int j = flvPacket.size; j >= 0; j--)
 			{
@@ -605,9 +596,7 @@ void CFlvParser::GetMediaInfo(MediaInfo &media)
 	media = m_mediaInfo;
 }
 
-/******************************************
- *从文件中以小端方式读取4字节内容
-/******************************************/
+//Little endlian
 uint32_t CFlvParser::ReadFile32()
 {
 	uint32_t tmp = 0;

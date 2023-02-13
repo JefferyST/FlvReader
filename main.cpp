@@ -12,7 +12,7 @@ int main(int argc, char *argv[])
     FILE *pOutVideo = fopen(outVidoeFile,"wb");
     FILE *pOutAudio = fopen(outAudioFile,"wb");
 
-    //获取文件信息
+   
     MediaInfo info;
     DEMUX_OpenFile(inputFile,info);
     DataPacket packet;
@@ -20,8 +20,8 @@ int main(int argc, char *argv[])
 
 	if (V_CODEC_ID_H264 == info.video_codec_id)
 	{
-		fwrite(info.SPS_PPS.SPSData, info.SPS_PPS.SPSDataSize, 1, pOutVideo);//写sps
-		fwrite(info.SPS_PPS.PPSData, info.SPS_PPS.PPSDataSize, 1, pOutVideo);//写pps	
+		fwrite(info.SPS_PPS.SPSData, info.SPS_PPS.SPSDataSize, 1, pOutVideo);//sps
+		fwrite(info.SPS_PPS.PPSData, info.SPS_PPS.PPSDataSize, 1, pOutVideo);//pps	
 	}
 	
     while(true)
@@ -35,9 +35,9 @@ int main(int argc, char *argv[])
         else
         {
 			if (packet.stream_type == TYPE_VIDEO)
-				fwrite(packet.data, packet.data_size, 1, pOutVideo);//视频写到文件    
+				fwrite(packet.data, packet.data_size, 1, pOutVideo); 
             else if (packet.stream_type == TYPE_AUDIO)
-                fwrite(packet.data, packet.data_size,1,pOutAudio);//音频写到文件
+                fwrite(packet.data, packet.data_size,1,pOutAudio);
         }
 
     }

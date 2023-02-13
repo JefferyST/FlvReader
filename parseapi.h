@@ -9,7 +9,7 @@ enum VideoType {
 	TYPE_FLV,
 };
 
-//接口
+
 int DEMUX_OpenFile(const char *name,MediaInfo &info);
 int DEMUX_ReadFrame(DataPacket &packet);
 int DEMUX_CloseFile();

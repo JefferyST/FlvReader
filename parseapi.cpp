@@ -4,11 +4,6 @@ CFlvParser gFlv;
 FILE* gFile = NULL;
 int gVideoType = 0;
 
-/*********************************************
-* 功能：打开文件
-* 输入：文件名，媒体信息结构体
-* 返回：成功1，失败0
-*********************************************/
 int DEMUX_OpenFile(const char *name, MediaInfo &info)
 {
 	gFile = fopen(name, "rb");
@@ -26,7 +21,6 @@ int DEMUX_OpenFile(const char *name, MediaInfo &info)
 	}
 	else
 	{   
-		//不支持文件类型
 		return -1;
 	}
 
@@ -34,11 +28,6 @@ int DEMUX_OpenFile(const char *name, MediaInfo &info)
 }
 
 
-/*********************************************
-* 功能：读取帧数据
-* 输入：数据帧结构体
-* 返回：读取的音视频数据大小，读取结束返回-1
-*********************************************/
 int DEMUX_ReadFrame(DataPacket &packet)
 {
 	DataPacket tmpPacket;
@@ -56,12 +45,6 @@ int DEMUX_ReadFrame(DataPacket &packet)
     
 }
 
-
-/*********************************************
-* 功能：关闭文件
-* 输入：无
-* 返回：1
-*********************************************/
 int DEMUX_CloseFile()
 {
 	if (gFile != NULL)
