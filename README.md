@@ -21,6 +21,6 @@ This repository was forked from [this](https://github.com/timesir/flvDemuxerSour
 ![audio2](https://raw.githubusercontent.com/JefferyST/FlvReader/main/images/Audio%20Specific%20Config.png)
 
 ## Reference  
-1. [blogs](https://www.cnblogs.com/shawn-meng/p/15925227.html)  
+1. [Blogs](https://www.cnblogs.com/shawn-meng/p/15925227.html)  
 2. [Wiki](https://wiki.multimedia.cx/index.php?title=MPEG-4_Audio)
 
